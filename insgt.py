@@ -2,43 +2,55 @@ import streamlit as st
 import pymongo
 import requests
 import json
-import uuid
 from bson.objectid import ObjectId
 from datetime import datetime
+from urllib.parse import urlencode, parse_qs
 
-# MongoDB Setup
-MONGO_URI = "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
-client = pymongo.MongoClient(MONGO_URI)
-db = client["automation_system"]
-automations = db["automations"]  # Collection for automation rules
-
-# Meta API Endpoints
+# Constants
+CLIENT_ID = "<your_client_id>"
+CLIENT_SECRET = "<your_client_secret>"
+REDIRECT_URI = "https://your_redirect_url.com"
+MONGO_CONNECTION_STRING = "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
 GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
 
-# Securely store access tokens (use environment variables in production)
-st.session_state.setdefault("access_token", None)
-st.session_state.setdefault("page_id", None)
-st.session_state.setdefault("instagram_id", None)
+# MongoDB Setup
+client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
+db = client["automation_system"]
+automations = db["automations"]  # Collection for automation rules
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Instagram DM Automation", layout="wide")
 
-# Login Section
-def login():
-    st.title("Login with Facebook Business")
+# Securely store session state variables
+st.session_state.setdefault("access_token", None)
+st.session_state.setdefault("page_id", None)
+st.session_state.setdefault("instagram_id", None)
 
-    if "access_token" not in st.session_state or not st.session_state.access_token:
-        client_id = "<your_app_id>"
-        redirect_uri = "https://localhost/"
-        auth_url = f"https://www.facebook.com/v21.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope=pages_manage_metadata,pages_messaging,instagram_manage_comments"
+# Generate Facebook Login URL
+def get_facebook_login_url():
+    params = {
+        "client_id": CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+        "scope": "pages_manage_metadata,pages_messaging,instagram_manage_comments",
+        "response_type": "code",
+    }
+    return f"https://www.facebook.com/v21.0/dialog/oauth?{urlencode(params)}"
 
-        st.markdown(f"[Login with Facebook]({auth_url})")
-        token_input = st.text_input("Enter Access Token:")
-
-        if token_input:
-            st.session_state.access_token = token_input
-            fetch_page_and_instagram_ids()
-            st.success("Logged in successfully!")
+# Exchange Code for Access Token
+def exchange_code_for_access_token(auth_code):
+    token_url = f"{GRAPH_API_BASE}/oauth/access_token"
+    params = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri": REDIRECT_URI,
+        "code": auth_code,
+    }
+    response = requests.get(token_url, params=params)
+    if response.status_code == 200:
+        return response.json().get("access_token")
+    else:
+        st.error("Failed to exchange code for access token.")
+        return None
 
 # Fetch Page and Instagram IDs
 def fetch_page_and_instagram_ids():
@@ -110,40 +122,6 @@ def create_automation():
             }
             save_automation(automation_data)
 
-# Handle Triggers and Responses
-def handle_trigger(trigger_type, trigger_word, response_message, buttons):
-    headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
-
-    # Example endpoint for handling comments
-    if trigger_type == "Comment":
-        url = f"{GRAPH_API_BASE}/{st.session_state.instagram_id}/media?fields=comments{{id,message}}"
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            comments = response.json().get("data", [])
-            for comment in comments:
-                if trigger_word.lower() in comment["message"].lower():
-                    comment_id = comment["id"]
-                    reply_url = f"{GRAPH_API_BASE}/{comment_id}/replies"
-                    payload = {"message": response_message}
-
-                    if buttons:
-                        payload["attachment"] = {
-                            "type": "template",
-                            "payload": {
-                                "template_type": "button",
-                                "text": response_message,
-                                "buttons": [
-                                    {"type": "web_url", "url": btn["url"], "title": btn["label"]}
-                                    for btn in buttons
-                                ],
-                            },
-                        }
-
-                    reply_response = requests.post(reply_url, headers=headers, json=payload)
-                    if reply_response.status_code == 200:
-                        st.success(f"Replied to comment: {comment['message']}")
-
 # View Automations Section
 def view_automations():
     st.title("View Automations")
@@ -164,8 +142,26 @@ def view_automations():
                 st.write(f"- {btn['label']} ({btn['url']})")
 
         if st.button("Delete", key=str(automation["_id"])):
-            automations.delete_one({"_id": ObjectId(automation["_id"])})
+            automations.delete_one({"_id": ObjectId(automation["_id"])});
             st.experimental_rerun()
+
+# Handle OAuth Login
+def login():
+    st.title("Login with Facebook Business")
+
+    if "access_token" not in st.session_state or not st.session_state.access_token:
+        auth_code = st.experimental_get_query_params().get("code")
+
+        if auth_code:
+            auth_code = auth_code[0]
+            access_token = exchange_code_for_access_token(auth_code)
+            if access_token:
+                st.session_state.access_token = access_token
+                fetch_page_and_instagram_ids()
+                st.success("Logged in successfully!")
+        else:
+            auth_url = get_facebook_login_url()
+            st.markdown(f"[Login with Facebook]({auth_url})")
 
 # Streamlit Navigation
 menu = st.sidebar.selectbox("Menu", ["Login", "Create Automation", "View Automations"])
