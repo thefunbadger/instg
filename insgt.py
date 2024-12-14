@@ -5,7 +5,8 @@ import json
 from bson.objectid import ObjectId
 from datetime import datetime
 from urllib.parse import urlencode, parse_qs
-
+# Streamlit App Configuration
+st.set_page_config(page_title="Instagram DM Automation", layout="wide")
 # Load secrets
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
@@ -24,8 +25,7 @@ except pymongo.errors.ConfigurationError as e:
 except Exception as e:
     st.error(f"An unexpected error occurred: {str(e)}")
 
-# Streamlit App Configuration
-st.set_page_config(page_title="Instagram DM Automation", layout="wide")
+
 
 # Securely store session state variables
 st.session_state.setdefault("access_token", None)
