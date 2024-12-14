@@ -6,17 +6,23 @@ from bson.objectid import ObjectId
 from datetime import datetime
 from urllib.parse import urlencode, parse_qs
 
-# Constants
-CLIENT_ID = "<your_client_id>"
-CLIENT_SECRET = "<your_client_secret>"
-REDIRECT_URI = "https://your_redirect_url.com"
-MONGO_CONNECTION_STRING = "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority&appName=<appName>"
+# Load secrets
+CLIENT_ID = st.secrets["CLIENT_ID"]
+CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
+MONGO_CONNECTION_STRING = st.secrets["MONGO_CONNECTION_STRING"]
 GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
 
 # MongoDB Setup
-client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
-db = client["automation_system"]
-automations = db["automations"]  # Collection for automation rules
+try:
+    client = pymongo.MongoClient(MONGO_CONNECTION_STRING)
+    db = client["automation_system"]
+    automations = db["automations"]
+    st.success("MongoDB connected successfully.")
+except pymongo.errors.ConfigurationError as e:
+    st.error(f"MongoDB Configuration Error: {str(e)}")
+except Exception as e:
+    st.error(f"An unexpected error occurred: {str(e)}")
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Instagram DM Automation", layout="wide")
@@ -142,7 +148,7 @@ def view_automations():
                 st.write(f"- {btn['label']} ({btn['url']})")
 
         if st.button("Delete", key=str(automation["_id"])):
-            automations.delete_one({"_id": ObjectId(automation["_id"])});
+            automations.delete_one({"_id": ObjectId(automation["_id"])})
             st.experimental_rerun()
 
 # Handle OAuth Login
