@@ -10,7 +10,7 @@ from urllib.parse import urlencode, parse_qs
 CLIENT_ID = "<your_client_id>"
 CLIENT_SECRET = "<your_client_secret>"
 REDIRECT_URI = "https://your_redirect_url.com"
-MONGO_CONNECTION_STRING = "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
+MONGO_CONNECTION_STRING = "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority&appName=<appName>"
 GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
 
 # MongoDB Setup
